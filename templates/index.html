@@ -1,0 +1,128 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Concrete Performance Predictor</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <main class="container">
+    <header>
+      <p class="eyebrow">MACHINE LEARNING PROJECT</p>
+      <h1>Concrete Performance Predictor</h1>
+      <p>Estimate concrete compressive strength from mix proportions and curing age.</p>
+    </header>
+
+    <div class="notice">
+      <strong>Important:</strong> This tool predicts concrete strength, not the
+      lifespan of a house or whether a structure is safe.
+    </div>
+
+    <form id="prediction-form">
+      <h2>Concrete mix details</h2>
+      <p class="muted">Ingredients are in kg/m³. Curing age is in days.</p>
+
+      <div class="fields">
+        <label>Cement (kg/m³)
+          <input name="cement" type="number" min="0.01" max="1200"
+                 value="300" step="any" required>
+        </label>
+        <label>Blast furnace slag (kg/m³)
+          <input name="slag" type="number" min="0" max="1200"
+                 value="0" step="any" required>
+        </label>
+        <label>Fly ash (kg/m³)
+          <input name="fly_ash" type="number" min="0" max="1200"
+                 value="0" step="any" required>
+        </label>
+        <label>Water (kg/m³)
+          <input name="water" type="number" min="0" max="600"
+                 value="180" step="any" required>
+        </label>
+        <label>Superplasticizer (kg/m³)
+          <input name="superplasticizer" type="number" min="0" max="200"
+                 value="0" step="any" required>
+        </label>
+        <label>Coarse aggregate (kg/m³)
+          <input name="coarse_aggregate" type="number" min="0" max="2000"
+                 value="1000" step="any" required>
+        </label>
+        <label>Fine aggregate / sand (kg/m³)
+          <input name="fine_aggregate" type="number" min="0" max="2000"
+                 value="750" step="any" required>
+        </label>
+        <label>Curing age (days)
+          <input name="age" type="number" min="1" max="365"
+                 value="28" step="1" required>
+        </label>
+      </div>
+
+      <button type="submit" id="submit-button">Predict strength</button>
+    </form>
+
+    <section id="result" class="result" aria-live="polite" hidden>
+      <p class="eyebrow">MODEL ESTIMATE</p>
+      <h2 id="strength"></h2>
+      <p id="detail"></p>
+    </section>
+
+    <section class="metrics">
+      <h2>Model test performance</h2>
+      <p>Measured during training on a held-out test set.</p>
+      <div class="metric-grid">
+        <div><span>MAE</span><strong>{{ metrics.MAE_MPa }} MPa</strong></div>
+        <div><span>RMSE</span><strong>{{ metrics.RMSE_MPa }} MPa</strong></div>
+        <div><span>R²</span><strong>{{ metrics.R2 }}</strong></div>
+      </div>
+    </section>
+
+    <footer>
+      Educational prototype only. Concrete mix design and structural safety
+      must be verified by qualified civil/structural engineers and appropriate
+      laboratory tests.
+    </footer>
+  </main>
+
+  <script>
+    const form = document.getElementById("prediction-form");
+    const button = document.getElementById("submit-button");
+    const result = document.getElementById("result");
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+
+      const payload = Object.fromEntries(new FormData(form).entries());
+      for (const key in payload) payload[key] = Number(payload[key]);
+
+      button.disabled = true;
+      button.textContent = "Predicting...";
+
+      try {
+        const response = await fetch("/predict", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Prediction failed.");
+
+        document.getElementById("strength").textContent =
+          `${data.predicted_strength_mpa} MPa`;
+
+        document.getElementById("detail").textContent = data.disclaimer;
+        result.hidden = false;
+      } catch (error) {
+        result.hidden = false;
+        document.getElementById("strength").textContent = "Unable to predict";
+        document.getElementById("detail").textContent = error.message;
+      } finally {
+        button.disabled = false;
+        button.textContent = "Predict strength";
+      }
+    });
+  </script>
+</body>
+</html>
